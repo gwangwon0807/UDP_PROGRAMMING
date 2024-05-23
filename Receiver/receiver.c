@@ -13,9 +13,10 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Usage: %s <receiver port> <drop probability>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-    
-    int receiver_port = atoi(argv[1]);
-    float drop_probability = atof(argv[2]);
+
+  struct Packet packet;    
+  int receiver_port = atoi(argv[1]);
+  float drop_probability = atof(argv[2]);
 
   // 소켓 생성
   int sockfd;
@@ -39,18 +40,18 @@ int main(int argc, char** argv) {
   }
 
   // 인사, 파일명 수신
-  char buffer[BUF_SIZE];
-  memset(buffer, 0, sizeof(buffer));
+  char file_buffer[BUF_SIZE];
+  memset(file_buffer, 0, sizeof(file_buffer));
   clnt_addr_size = sizeof(client_addr);
 
   // "Greeting" 메시지 수신
-  recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
-  printf("Sender: %s\n", buffer);
-  memset(buffer, 0, sizeof(buffer));
+  recvfrom(sockfd,  file_buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
+  printf("Sender: %s\n", file_buffer);
+  memset(file_buffer, 0, sizeof(file_buffer));
   
   // file name 수신
-  recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
-  printf("File Name: %s\n", buffer);
+  recvfrom(sockfd, file_buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
+  printf("File Name: %s\n", file_buffer);
   
 
   // 응답 전송
@@ -59,14 +60,14 @@ int main(int argc, char** argv) {
 
   // 파일 저장하기
   FILE* fp;
-  fp = fopen(buffer, "wb");
-  memset(buffer, 0, sizeof(buffer));
+  fp = fopen(file_buffer, "wb");
+  memset(file_buffer, 0, sizeof(file_buffer));
   int size[1];
 
   recvfrom(sockfd, size, sizeof(size), 0, (struct  sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
   while(1)
   {
-    ssize_t num_bytes = recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
+    ssize_t num_bytes = recvfrom(sockfd, file_buffer, BUF_SIZE, 0, (struct sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
     
     if(num_bytes == -1)
     { 
@@ -74,30 +75,29 @@ int main(int argc, char** argv) {
       exit(1);
     }
 
-    if (num_bytes > 0 && strcmp(buffer, "Finish") == 0)
+    if (num_bytes > 0 && strcmp(file_buffer, "Finish") == 0)
     {
-      printf("Sender: %s", buffer);
+      printf("Sender: %s", file_buffer);
       break;
     }
 
-    if (size[0] > num_bytes)
+    if (size[0] > (int)sizeof(packet.buffer))
     { 
       size[0] -= num_bytes;   
-      fwrite(buffer, 1, num_bytes, fp);
+      fwrite(file_buffer, 1, num_bytes, fp);
     }
     else
     {
-      fwrite(buffer, 1, size[0], fp);
+      fwrite(file_buffer, 1, size[0], fp);
     }
-    memset(buffer, 0, sizeof(buffer));
+    memset(file_buffer, 0, sizeof(file_buffer));
   }
-  memset(buffer, 0, sizeof(buffer));
+  memset(file_buffer, 0, sizeof(file_buffer));
 
   sleep(1);
   sendto(sockfd, "Welldone", strlen("Welldone"), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 
   fclose(fp);
-  close(sockfd);
 
   return 0;
 
