@@ -5,21 +5,24 @@
 
 //socket통신을 위한 headerfile
 #include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 
-#define BUF_SIZE 1024
-#define PORT 12345
+#define BUF_SIZE 200
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    fprintf(stderr, "Usage: %s [File Path]\n", argv[0]);
-    exit(EXIT_FAILURE);
-  }
+  if (argc != 7) {
+        fprintf(stderr, "Usage: %s <sender port> <receiver IP> <receiver port> <timeout interval> <filename> <drop probability>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    
+    int sender_port = atoi(argv[1]);
+    char *receiver_ip = argv[2];
+    int receiver_port = atoi(argv[3]);
+    int timeout_interval = atoi(argv[4]);
+    char *filename = argv[5];
+    float drop_probability = atof(argv[6]);
 
   // 파일 열기
-  FILE *fp = fopen(argv[1], "rb");
+  FILE *fp = fopen(filename, "rb");
   if (fp == NULL) {
     perror("file open failed");
     exit(EXIT_FAILURE);
@@ -36,12 +39,12 @@ int main(int argc, char** argv) {
   struct sockaddr_in server_addr;
   memset(&server_addr, 0, sizeof(server_addr));
   server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-  server_addr.sin_port = htons(PORT);
+  server_addr.sin_addr.s_addr = inet_addr(receiver_ip);
+  server_addr.sin_port = htons(receiver_port);
   
   // 파일 이름 전송
   sendto(sockfd, "Greeting", strlen("Greeting"), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-  sendto(sockfd, argv[1], strlen(argv[1]) + 1, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+  sendto(sockfd, filename, strlen(filename) + 1, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 
   // 응답 대기
   char response[BUF_SIZE];
@@ -56,11 +59,16 @@ int main(int argc, char** argv) {
   size[0] = (int)ftell(fp);
   fseek(fp, 0L, SEEK_SET);
 
-  if(!(strcmp(response, "OK"))){
-    fread(buffer, sizeof(char), BUF_SIZE, fp);
+  if(!(strcmp(response, "OK")))
+  {
     sendto(sockfd, size, sizeof(size), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-    sendto(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-
+    size_t bytesRead;
+    while(bytesRead = fread(buffer, 1, BUF_SIZE, fp) > 0)
+    {
+      sendto(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+      memset(buffer, 0, sizeof(buffer));
+    }
+    printf("Finish\n");
     // 전송 완료 메시지 전송
     sendto(sockfd, "Finish", strlen("Finish"), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   }
