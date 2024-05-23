@@ -39,20 +39,18 @@ int main(int argc, char** argv) {
   }
 
   // 인사, 파일명 수신
-  char com_buffer[BUF_SIZE];
-  char file_buffer[BUF_SIZE];
-  memset(com_buffer, 0, sizeof(com_buffer));
-  memset(file_buffer, 0, sizeof(file_buffer));
+  char buffer[BUF_SIZE];
+  memset(buffer, 0, sizeof(buffer));
   clnt_addr_size = sizeof(client_addr);
 
   // "Greeting" 메시지 수신
-  recvfrom(sockfd, com_buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
-  printf("Sender: %s\n", com_buffer);
-  memset(com_buffer, 0, sizeof(com_buffer));
+  recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
+  printf("Sender: %s\n", buffer);
+  memset(buffer, 0, sizeof(buffer));
   
   // file name 수신
-  recvfrom(sockfd, com_buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
-  printf("File Name: %s\n", com_buffer);
+  recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
+  printf("File Name: %s\n", buffer);
   
 
   // 응답 전송
@@ -61,13 +59,14 @@ int main(int argc, char** argv) {
 
   // 파일 저장하기
   FILE* fp;
-  fp = fopen(com_buffer, "wb");
+  fp = fopen(buffer, "wb");
+  memset(buffer, 0, sizeof(buffer));
   int size[1];
 
   recvfrom(sockfd, size, sizeof(size), 0, (struct  sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
   while(1)
   {
-    ssize_t num_bytes = recvfrom(sockfd, file_buffer, BUF_SIZE, 0, (struct sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
+    ssize_t num_bytes = recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
     
     if(num_bytes == -1)
     { 
@@ -75,30 +74,30 @@ int main(int argc, char** argv) {
       exit(1);
     }
 
-    if (num_bytes > 0 && strcmp(file_buffer, "Finish") == 0)
+    if (num_bytes > 0 && strcmp(buffer, "Finish") == 0)
     {
-      printf("Sender: %s", file_buffer);
+      printf("Sender: %s", buffer);
       break;
     }
 
     if (size[0] > num_bytes)
     { 
       size[0] -= num_bytes;   
-      fwrite(file_buffer, 1, num_bytes, fp);
+      fwrite(buffer, 1, num_bytes, fp);
     }
     else
     {
-      fwrite(file_buffer, 1, size[0], fp);
+      fwrite(buffer, 1, size[0], fp);
     }
-    memset(file_buffer, 0, sizeof(file_buffer));
+    memset(buffer, 0, sizeof(buffer));
   }
-  memset(com_buffer, 0, sizeof(com_buffer));
-
+  memset(buffer, 0, sizeof(buffer));
 
   sleep(1);
   sendto(sockfd, "Welldone", strlen("Welldone"), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 
   fclose(fp);
+  close(sockfd);
 
   return 0;
 
