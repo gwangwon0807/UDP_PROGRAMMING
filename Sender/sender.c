@@ -8,12 +8,21 @@
 
 #define BUF_SIZE 200
 
+typedef struct {
+    int type;
+    int seqNum;
+    int ackNum;
+    int length;
+    char data[BUF_SIZE];
+} Packet;
+
 int main(int argc, char** argv) {
   if (argc != 7) {
         fprintf(stderr, "Usage: %s <sender port> <receiver IP> <receiver port> <timeout interval> <filename> <drop probability>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-    
+    Packet packet;
+
     int sender_port = atoi(argv[1]);
     char *receiver_ip = argv[2];
     int receiver_port = atoi(argv[3]);
@@ -63,18 +72,23 @@ int main(int argc, char** argv) {
   {
     sendto(sockfd, size, sizeof(size), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
     size_t bytesRead;
-    while(bytesRead = fread(buffer, 1, BUF_SIZE, fp) > 0)
+    memset(&packet.data, 0, sizeof(packet.data));
+
+    while (bytesRead = fread(packet.data, 1, BUF_SIZE, fp) > 0)
     {
-      sendto(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-      memset(buffer, 0, sizeof(buffer));
+      sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+      memset(&packet.data, 0, sizeof(packet.data));
     }
     printf("Finish\n");
+
     // 전송 완료 메시지 전송
-    sendto(sockfd, "Finish", strlen("Finish"), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    packet.type = 1;
+    sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   }
   sleep(1);
 
   // 응답 대기
+  memset(response, 0, sizeof(response));
   recvfrom(sockfd, response, BUF_SIZE, 0, NULL, NULL);
   printf("Receiver: %s\n", response);
 
