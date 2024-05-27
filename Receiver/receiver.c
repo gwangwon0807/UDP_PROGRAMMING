@@ -24,6 +24,8 @@ int main(int argc, char** argv) {
     }
 
   Packet packet;
+  Packet pre_packet;
+
   int receiver_port = atoi(argv[1]);
   float drop_probability = atof(argv[2]);
 
@@ -49,55 +51,74 @@ int main(int argc, char** argv) {
   }
 
   // 인사, 파일명 수신
-  char file_buffer[BUF_SIZE];
-  memset(file_buffer, 0, sizeof(file_buffer));
+  char buffer[BUF_SIZE];
+  memset(buffer, 0, sizeof(buffer));
   clnt_addr_size = sizeof(client_addr);
 
   // "Greeting" 메시지 수신
-  recvfrom(sockfd,  file_buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
-  printf("Sender: %s\n", file_buffer);
-  memset(file_buffer, 0, sizeof(file_buffer));
+  recvfrom(sockfd,  buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
+  printf("Sender: %s\n", buffer);
+  memset(buffer, 0, sizeof(buffer));
   
   // file name 수신
-  recvfrom(sockfd, file_buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
-  printf("File Name: %s\n", file_buffer);
+  recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
+  printf("File Name: %s\n", buffer);
   
 
   // 응답 전송
-  sleep(1);
+  
   sendto(sockfd, "OK", strlen("OK"), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
 
   // 파일 저장하기
   FILE* fp;
-  fp = fopen(file_buffer, "wb");
-  memset(file_buffer, 0, sizeof(file_buffer));
+  fp = fopen(buffer, "wb");
+  memset(buffer, 0, sizeof(buffer));
   memset(&packet, 0, sizeof(Packet));
   int size[1];
 
   recvfrom(sockfd, size, sizeof(size), 0, (struct  sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
+  int ackNum = 1;
+
   while(1)
   {
-    //ssize_t num_bytes = recvfrom(sockfd, file_buffer, BUF_SIZE, 0, (struct sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
-    ssize_t num_bytes = recvfrom(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
+    ssize_t num_bytes = recvfrom(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
+
+    if (packet.type == 0)
+    {
+      printf("Sender: Finish, Type: %d\n", packet.type);
+      break;
+    }
+
+    printf("Seq: %d, Ack: %d, Type: %d\n", packet.seqNum, ackNum, packet.type);
+
+    packet.ackNum = ackNum;
+    packet.type = 2;
+
+    //prevent ack loss 
+    if(pre_packet.seqNum == packet.seqNum)
+    {
+      sendto(sockfd, &pre_packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+    }    
+    else
+    {
+      sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+    }
+
+    if ((ackNum % 2)== 0)
+    {
+      ackNum++;
+    }
+    else
+    {
+      ackNum--;
+    }
 
     if(num_bytes == -1)
     { 
       printf("recv error\n");
       exit(1);
     }
-
-    /*if (num_bytes > 0 && strcmp(packet.data, "Finish") == 0)
-    {
-      printf("Sender: %s", packet.data);
-      break;
-    }*/
-
-    if (packet.type == 1)
-    {
-      printf("Sender: Finish\n");
-      break;
-    }
-
+    
     if (size[0] > BUF_SIZE)
     { 
       size[0] -= BUF_SIZE;   
@@ -107,28 +128,12 @@ int main(int argc, char** argv) {
     {
       fwrite(packet.data, 1, size[0], fp);
     }
-    printf("%s\n", packet.data);
-    memset(&packet.data, 0, sizeof(packet.data));
-    /*if (num_bytes > 0 && strcmp(file_buffer, "Finish") == 0)
-    {
-      printf("Sender: %s", file_buffer);
-      break;
-    }
-
-    if (size[0] > num_bytes)
-    { 
-      size[0] -= num_bytes;   
-      fwrite(file_buffer, 1, num_bytes, fp);
-    }
-    else
-    {
-      fwrite(file_buffer, 1, strlen(file_buffer), fp);
-    }
-    memset(file_buffer, 0, sizeof(file_buffer));*/
+    memset(&pre_packet,0,sizeof(Packet));
+    pre_packet = packet;
+    memset(&packet, 0, sizeof(Packet));
   }
-  memset(file_buffer, 0, sizeof(file_buffer));
 
-  sleep(1);
+  
   sendto(sockfd, "Welldone", strlen("Welldone"), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 
   fclose(fp);
