@@ -73,14 +73,15 @@ int main(int argc, char** argv) {
   FILE* fp;
   fp = fopen(buffer, "wb");
   memset(buffer, 0, sizeof(buffer));
-  memset(&packet, 0, sizeof(Packet));
   int size[1];
 
   recvfrom(sockfd, size, sizeof(size), 0, (struct  sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
   int ackNum = 1;
-
+  srand(time(NULL));
   while(1)
   {
+    int percent = rand() % 100;
+    memset(&packet, 0, sizeof(Packet));
     ssize_t num_bytes = recvfrom(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
 
     if (packet.type == 0)
@@ -93,25 +94,6 @@ int main(int argc, char** argv) {
 
     packet.ackNum = ackNum;
     packet.type = 2;
-
-    //prevent ack loss 
-    if(pre_packet.seqNum == packet.seqNum)
-    {
-      sendto(sockfd, &pre_packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
-    }    
-    else
-    {
-      sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
-    }
-
-    if ((ackNum % 2)== 0)
-    {
-      ackNum++;
-    }
-    else
-    {
-      ackNum--;
-    }
 
     if(num_bytes == -1)
     { 
@@ -128,11 +110,37 @@ int main(int argc, char** argv) {
     {
       fwrite(packet.data, 1, size[0], fp);
     }
+
+    if(percent < (int)(drop_probability * 100))
+    {
+      printf("prob\n");
+      printf("%d, %d\n", percent, (int)(drop_probability * 100));
+      continue;
+    }
+    else
+    {
+      //ack loss
+      if(pre_packet.seqNum == packet.seqNum)
+      {
+        sendto(sockfd, &pre_packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+      }    
+      else
+      {
+        sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+        
+        if ((ackNum % 2)== 0)
+        {
+          ackNum++;
+        }
+        else
+        {
+          ackNum--;
+        }
+      }
+    }
     memset(&pre_packet,0,sizeof(Packet));
     pre_packet = packet;
-    memset(&packet, 0, sizeof(Packet));
-  }
-
+  }  
   
   sendto(sockfd, "Welldone", strlen("Welldone"), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 

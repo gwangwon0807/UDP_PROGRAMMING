@@ -96,6 +96,7 @@ int main(int argc, char** argv)
 
       packet.seqNum = seqNum;
       packet.type = 1;
+      pre_packet.type = 1;
       sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
       
       //timeout 발생시 재전송
@@ -131,6 +132,7 @@ int main(int argc, char** argv)
 
 void resend()
 {
-  sendto(sockfd, &pre_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+  sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+  printf("resend\n");
   alarm(timeout_interval);
 }
