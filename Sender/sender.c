@@ -21,7 +21,9 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Usage: %s <sender port> <receiver IP> <receiver port> <timeout interval> <filename> <drop probability>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
+
     Packet packet;
+    memset(&packet, 0, sizeof(Packet));
 
     int sender_port = atoi(argv[1]);
     char *receiver_ip = argv[2];
@@ -56,9 +58,11 @@ int main(int argc, char** argv) {
   sendto(sockfd, filename, strlen(filename) + 1, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 
   // 응답 대기
-  char response[BUF_SIZE];
+  /*char response[BUF_SIZE];
   recvfrom(sockfd, response, BUF_SIZE, 0, NULL, NULL);
-  printf("Receiver: %s\n", response);
+  printf("Receiver: %s\n", response);*/
+  recvfrom(sockfd, &packet, sizeof(Packet), 0, NULL, NULL);
+  printf("Receiver: %s\n", packet.data);
   sleep(1);
 
   // 파일 전송
@@ -68,7 +72,7 @@ int main(int argc, char** argv) {
   size[0] = (int)ftell(fp);
   fseek(fp, 0L, SEEK_SET);
 
-  if(!(strcmp(response, "OK")))
+  if(!(strcmp(packet.data, "OK")))
   {
     sendto(sockfd, size, sizeof(size), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
     size_t bytesRead;
@@ -88,9 +92,14 @@ int main(int argc, char** argv) {
   sleep(1);
 
   // 응답 대기
-  memset(response, 0, sizeof(response));
+  /*memset(response, 0, sizeof(response));
   recvfrom(sockfd, response, BUF_SIZE, 0, NULL, NULL);
-  printf("Receiver: %s\n", response);
+  printf("Receiver: %s\n", response);*/
+  memset(&packet, 0, sizeof(Packet));
+  recvfrom(&packet, 0, sizeof(Packet))
+  printf("Receiver %s\n", packet.data);
+  memset(&packet, 0, sizeof(Packet));
+
 
   // 파일 닫기
   fclose(fp);
