@@ -1,16 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-
-struct typedef
-{
-  int ack;
-  int seq;
-  int len;
-   
-}
-
+#include <string.h>
 int main ()
 {
-  FILE* fp = open("hello", "wb");
-  
+  char b = "recv\t\t";
+  ssize_t a = strlen(*b);
+  printf("%d", a);
 }
