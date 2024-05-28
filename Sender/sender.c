@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
+#include <time.h>
 
 //socket통신을 위한 headerfile
 #include <arpa/inet.h>
@@ -48,6 +49,9 @@ int main(int argc, char** argv)
     exit(EXIT_FAILURE);
   }
 
+  FILE *log = fopen("Sender's log", "wb");
+  fwrite("Seq\t\tAck\t\tLength\tLoss\tTimeout\t\ttime\n", 1, strlen("Seq\t\tAck\t\tLength\tLoss\tTimeout\t\ttime\n"), log);
+
   // 소켓 생성
   if ((sockfd = socket(PF_INET, SOCK_DGRAM, 0)) == -1) 
   {
@@ -84,6 +88,9 @@ int main(int argc, char** argv)
   sigemptyset(&sa.sa_mask);
   sigaction(SIGALRM, &sa, NULL);
   
+  srand(time(NULL));
+  clock_t t;
+  double time_taken;
 
   if(!(strcmp(buffer, "OK")))
   {
@@ -93,27 +100,38 @@ int main(int argc, char** argv)
 
     while (bytesRead = fread(packet.data, 1, BUF_SIZE, fp) > 0)
     {
-
+      int percent = rand() % 100;
       packet.seqNum = seqNum;
       packet.type = 1;
       pre_packet.type = 1;
-      sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-      
-      //timeout 발생시 재전송
+
+       //timeout 발생시 재전송
       alarm(timeout_interval);
+      t = clock();
+      if(percent < (int)(drop_probability * 100))
+      { 
+        printf("prob\n");
+        usleep(timeout_interval * 1000);
+      }
+      else
+      {
+        sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+      }
       recvfrom(sockfd, &packet, sizeof(Packet),0, NULL, NULL);
       alarm(0);
+      t = clock() - t;
+      time_taken = ((double)t) / CLOCKS_PER_SEC; //Send and Receive Time
 
-      printf("Seq: %d, Ack: %d Type:%d preAck: %d\n", seqNum++, packet.ackNum, packet.type, pre_packet.ackNum);
+      printf("Seq: %d, Ack: %d Type:%d preAck: %d, time: %lf\n", seqNum++, packet.ackNum, packet.type, pre_packet.ackNum, time_taken);
       memset(&pre_packet, 0, sizeof(Packet));
       pre_packet = packet;
-      printf("preAck: %d\n", pre_packet.ackNum);
       memset(&packet, 0, sizeof(Packet));
     }
 
     // 전송 완료 메시지 전송
     packet.type = 0;
     packet.seqNum = seqNum;
+    t = clock();
     sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   }
   
@@ -121,10 +139,13 @@ int main(int argc, char** argv)
   // 응답 대기
   memset(buffer, 0, sizeof(buffer));
   recvfrom(sockfd, buffer, BUF_SIZE, 0, NULL, NULL);
-  printf("Receiver: %s\n", buffer);
+  t = clock() - t;
+  time_taken = ((double)t) / CLOCKS_PER_SEC; 
+  printf("Receiver: %s, %lf\n", buffer, time_taken);
 
   // 파일 닫기
   fclose(fp);
+  fclose(log);
   close(sockfd);
   
   return 0;

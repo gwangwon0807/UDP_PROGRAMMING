@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include "../Packet/PACKET.h"
+#include <time.h>
 
 //socket통신을 위한 headerfile
 #include <arpa/inet.h>
@@ -66,7 +66,6 @@ int main(int argc, char** argv) {
   
 
   // 응답 전송
-  
   sendto(sockfd, "OK", strlen("OK"), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
 
   // 파일 저장하기
@@ -78,6 +77,7 @@ int main(int argc, char** argv) {
   recvfrom(sockfd, size, sizeof(size), 0, (struct  sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
   int ackNum = 1;
   srand(time(NULL));
+
   while(1)
   {
     int percent = rand() % 100;
