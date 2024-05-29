@@ -17,14 +17,41 @@ typedef struct {
     char data[BUF_SIZE];
 } Packet;
 
+typedef struct {
+  int log_mode;
+  int log_type;
+  int log_seq;
+  int log_ack;
+  int log_length;
+  int log_loss;
+  int log_timeout;
+  float log_time_taken;
+} Log;
+
+Packet packet;
+Packet pre_packet;
+Log log_content;
+
+FILE* log_fp;
+
+void log_event(const char *event, Log *log_content, int is_timeout, double duration) {
+    fprintf(log_fp, "%s\t\t%d\t\t%d\t\t%d\t\t%d\t\t%s\t\t%s\t\t%f ms\n", 
+            event, 
+            log_content->log_type, 
+            log_content->log_seq,
+            log_content->log_ack,
+            log_content->log_length,
+            (log_content->log_loss == 1) ? "YES" : "NO", 
+            is_timeout ? "YES" : "NO", 
+            duration);
+    fflush(log_fp);
+}
+
 int main(int argc, char** argv) {
   if (argc != 3) {
         fprintf(stderr, "Usage: %s <receiver port> <drop probability>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-
-  Packet packet;
-  Packet pre_packet;
 
   int receiver_port = atoi(argv[1]);
   float drop_probability = atof(argv[2]);
@@ -74,33 +101,53 @@ int main(int argc, char** argv) {
   memset(buffer, 0, sizeof(buffer));
   int size[1];
 
+  log_fp = fopen("log.txt", "wb");
+  fwrite("\t\tType\t\tSeq\t\tAck\t\tLength\t\tLoss\t\tTimeout\t\ttime\n", 1, strlen("\t\tType\t\tSeq\t\tAck\t\tLength\t\tLoss\t\tTimeout\t\ttime\n"), log_fp);
+
   recvfrom(sockfd, size, sizeof(size), 0, (struct  sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
   int ackNum = 1;
   srand(time(NULL));
+  clock_t t;
 
   while(1)
   {
     int percent = rand() % 100;
     memset(&packet, 0, sizeof(Packet));
+    t = clock();
     ssize_t num_bytes = recvfrom(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
+
+    log_content.log_type = packet.type;
+    log_content.log_ack = packet.ackNum;
+    log_content.log_seq = packet.seqNum;
+    log_content.log_loss = 0;
+    
+    if(packet.seqNum > 0)
+    {
+      t = clock() - t;
+      log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC;
+    }
 
     if (packet.type == 2)
     {
+      log_event("RECV", &log_content, 0, log_content.log_time_taken);
       printf("Sender: Finish, Type: %d\n", packet.type);
       break;
     }
-
+    log_event("RECV", &log_content, 0, log_content.log_time_taken);
     printf("Seq: %d, Ack: %d, Type: %d\n", packet.seqNum, ackNum, packet.type);
 
     packet.ackNum = ackNum;
     packet.type = 1;
+    log_content.log_ack = packet.ackNum;
+    log_content.log_type = packet.type;
 
     if(num_bytes == -1)
     { 
       printf("recv error\n");
       exit(1);
     }
-    
+
+    t = clock();
     if (size[0] > BUF_SIZE)
     { 
       size[0] -= BUF_SIZE;   
@@ -110,16 +157,18 @@ int main(int argc, char** argv) {
     {
       fwrite(packet.data, 1, size[0], fp);
     }
-
+    
     if(percent < (int)(drop_probability * 100))
     {
+      log_content.log_loss = 1;
+      log_event("SEND", &log_content, 0, log_content.log_time_taken);
       printf("prob\n");
       printf("%d, %d\n", percent, (int)(drop_probability * 100));
       continue;
     }
     else
     {
-      //ack loss
+      log_event("SEND", &log_content, 0, log_content.log_time_taken);
       if(pre_packet.seqNum == packet.seqNum)
       {
         sendto(sockfd, &pre_packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
