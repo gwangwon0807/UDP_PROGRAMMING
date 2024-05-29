@@ -206,7 +206,7 @@ int main(int argc, char** argv)
   fclose(fp);
   //fclose(log_fp);
   close(sockfd);
-  
+  printf("%d", (int)sizeof(Packet));
   return 0;
 }
 

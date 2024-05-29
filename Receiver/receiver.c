@@ -150,11 +150,13 @@ int main(int argc, char** argv) {
     t = clock();
     if (size[0] > BUF_SIZE)
     { 
-      size[0] -= BUF_SIZE;   
+      size[0] -= BUF_SIZE;
+      log_content.log_length = BUF_SIZE;   
       fwrite(packet.data, 1, BUF_SIZE, fp);
     }
     else
     {
+      log_content.log_length = size[0];
       fwrite(packet.data, 1, size[0], fp);
     }
     
