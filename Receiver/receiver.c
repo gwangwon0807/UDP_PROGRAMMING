@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
     memset(&packet, 0, sizeof(Packet));
     ssize_t num_bytes = recvfrom(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
 
-    if (packet.type == 0)
+    if (packet.type == 2)
     {
       printf("Sender: Finish, Type: %d\n", packet.type);
       break;
@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
     printf("Seq: %d, Ack: %d, Type: %d\n", packet.seqNum, ackNum, packet.type);
 
     packet.ackNum = ackNum;
-    packet.type = 2;
+    packet.type = 1;
 
     if(num_bytes == -1)
     { 
