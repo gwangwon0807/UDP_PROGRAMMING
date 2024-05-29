@@ -157,7 +157,6 @@ int main(int argc, char** argv)
       t = clock();
       if(percent < (int)(drop_probability * 100))
       { 
-        printf("prob\n");
         log_content.log_loss = 1;
         log_event("SEND", &log_content, log_content.log_timeout, log_content.log_time_taken);
       }
@@ -174,8 +173,7 @@ int main(int argc, char** argv)
       t = clock() - t;
       log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC; //Send and Receive Time
       log_event("RECV", &log_content, log_content.log_timeout, log_content.log_time_taken);
-
-      printf("Seq: %d, Ack: %d Type:%d preAck: %d, time:\n", seqNum++, packet.ackNum, packet.type, pre_packet.ackNum);
+      seqNum++;
       memset(&pre_packet, 0, sizeof(Packet));
       pre_packet = packet;
       memset(&packet, 0, sizeof(Packet));
@@ -200,13 +198,12 @@ int main(int argc, char** argv)
   recvfrom(sockfd, buffer, BUF_SIZE, 0, NULL, NULL);
   t = clock() - t;
   float f_log_time_taken = ((float)t) / CLOCKS_PER_SEC; 
-  printf("Receiver: %s, %f\n", buffer, f_log_time_taken);
+  printf("Receiver: %s \n", buffer);
 
   // 파일 닫기
   fclose(fp);
   //fclose(log_fp);
   close(sockfd);
-  printf("%d", (int)sizeof(Packet));
   return 0;
 }
 
@@ -215,7 +212,6 @@ void resend()
   log_content.log_timeout = 1;
   sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   log_event("SEND", &log_content, log_content.log_timeout, log_content.log_time_taken);
-  printf("resend\n");
   alarm(timeout_interval);
   packet.type =1;
 }

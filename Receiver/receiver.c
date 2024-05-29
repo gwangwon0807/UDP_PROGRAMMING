@@ -130,11 +130,10 @@ int main(int argc, char** argv) {
     if (packet.type == 2)
     {
       log_event("RECV", &log_content, 0, log_content.log_time_taken);
-      printf("Sender: Finish, Type: %d\n", packet.type);
+      printf("Sender: Finish\n");
       break;
     }
     log_event("RECV", &log_content, 0, log_content.log_time_taken);
-    printf("Seq: %d, Ack: %d, Type: %d\n", packet.seqNum, ackNum, packet.type);
 
     packet.ackNum = ackNum;
     packet.type = 1;
@@ -164,8 +163,6 @@ int main(int argc, char** argv) {
     {
       log_content.log_loss = 1;
       log_event("SEND", &log_content, 0, log_content.log_time_taken);
-      printf("prob\n");
-      printf("%d, %d\n", percent, (int)(drop_probability * 100));
       continue;
     }
     else

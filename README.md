@@ -20,3 +20,6 @@
 3. This program has drop probability. If dropped packet, occur timeout and resend.
 4. Be written log.txt file in each directory. That include (type, seq, ack, length, loss, timout, time).
 5. Alarm system call must be entered in seconds in C. So minimum timout interval's size is '1'.
+6. Drop probability must be decimal type, ex. 0.1, 0.2....
+
+* When you compile, you can see waring message. You should ignore that.
