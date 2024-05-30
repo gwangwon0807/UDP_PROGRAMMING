@@ -108,7 +108,9 @@ int main(int argc, char** argv) {
   int ackNum = 1;
   srand(time(NULL));
   clock_t t;
-
+  int length = size[0];
+  int count = 1;
+  printf("Please wati..\n");
   while(1)
   {
     int percent = rand() % 100;
@@ -121,6 +123,12 @@ int main(int argc, char** argv) {
     log_content.log_seq = packet.seqNum;
     log_content.log_loss = 0;
     
+    if (size[0] - length >= size[0] *  (0.1 * count))
+    {
+      printf("%d%%", count++ * 10);
+    }
+    
+
     if(packet.seqNum > 0)
     {
       t = clock() - t;
@@ -130,6 +138,7 @@ int main(int argc, char** argv) {
     if (packet.type == 2)
     {
       log_event("RECV", &log_content, 0, log_content.log_time_taken);
+      printf("100%%\n");
       printf("Sender: Finish\n");
       break;
     }
@@ -147,9 +156,9 @@ int main(int argc, char** argv) {
     }
 
     t = clock();
-    if (size[0] > BUF_SIZE)
+    if (length > BUF_SIZE)
     { 
-      size[0] -= BUF_SIZE;
+      length -= BUF_SIZE;
       log_content.log_length = BUF_SIZE;   
       fwrite(packet.data, 1, BUF_SIZE, fp);
     }
@@ -189,10 +198,11 @@ int main(int argc, char** argv) {
     memset(&pre_packet,0,sizeof(Packet));
     pre_packet = packet;
   }  
-  
   sendto(sockfd, "Welldone", strlen("Welldone"), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 
   fclose(fp);
+  fclose(log_fp);
+  close(sockfd);
 
   return 0;
 

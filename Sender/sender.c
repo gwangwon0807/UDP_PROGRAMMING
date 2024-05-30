@@ -123,6 +123,8 @@ int main(int argc, char** argv)
   srand(time(NULL));
   clock_t t;
 
+  printf("Pleas wait..\n");
+
   if(!(strcmp(buffer, "OK")))
   {
     sendto(sockfd, size, sizeof(size), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
@@ -131,6 +133,7 @@ int main(int argc, char** argv)
     memset(&log_content, 0, sizeof(Log));
     log_content.log_ack = -999;
     int length = size[0];
+    int count = 1;
 
     while (bytesRead = fread(packet.data, 1, BUF_SIZE, fp) > 0)
     {
@@ -151,6 +154,11 @@ int main(int argc, char** argv)
         log_content.log_length = length;
       }
       log_content.log_time_taken = 0.0;
+
+      if (size[0] - length >= size[0] *  (0.1 * count))
+      {
+        printf("%d%%\n", count++ * 10);
+      }
 
        //timeout 발생시 재전송
       alarm(timeout_interval);
@@ -178,6 +186,7 @@ int main(int argc, char** argv)
       pre_packet = packet;
       memset(&packet, 0, sizeof(Packet));
     }
+    printf("100%%\n");
 
     // 전송 완료 메시지 전송
     packet.type = 2;
@@ -202,7 +211,7 @@ int main(int argc, char** argv)
 
   // 파일 닫기
   fclose(fp);
-  //fclose(log_fp);
+  fclose(log_fp);
   close(sockfd);
   return 0;
 }
