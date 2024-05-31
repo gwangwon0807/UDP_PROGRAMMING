@@ -24,6 +24,7 @@
 
 // Note
 1. Type: 0 - data, 1 - ack, 2 - EOT
+2. "10%, 20% .... 100%" is percentage of loading
 
 * When you compile, you can see warning message. You should ignore that.
 

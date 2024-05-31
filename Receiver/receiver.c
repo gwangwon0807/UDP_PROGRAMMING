@@ -1,32 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <time.h>
-
-//socket통신을 위한 headerfile
-#include <arpa/inet.h>
-
-#define BUF_SIZE 200
-
-typedef struct {
-    int type;
-    int seqNum;
-    int ackNum;
-    int length;
-    char data[BUF_SIZE];
-} Packet;
-
-typedef struct {
-  int log_mode;
-  int log_type;
-  int log_seq;
-  int log_ack;
-  int log_length;
-  int log_loss;
-  int log_timeout;
-  float log_time_taken;
-} Log;
+#include "../Packet/packet.h"
 
 Packet packet;
 Packet pre_packet;
@@ -110,7 +82,8 @@ int main(int argc, char** argv) {
   clock_t t;
   int length = size[0];
   int count = 1;
-  printf("Please wati..\n");
+  printf("Please wait..\n");
+
   while(1)
   {
     int percent = rand() % 100;
@@ -125,7 +98,7 @@ int main(int argc, char** argv) {
     
     if (size[0] - length >= size[0] *  (0.1 * count))
     {
-      printf("%d%%", count++ * 10);
+      printf("%d%%\n", count++ * 10);
     }
     
 
@@ -156,17 +129,6 @@ int main(int argc, char** argv) {
     }
 
     t = clock();
-    if (length > BUF_SIZE)
-    { 
-      length -= BUF_SIZE;
-      log_content.log_length = BUF_SIZE;   
-      fwrite(packet.data, 1, BUF_SIZE, fp);
-    }
-    else
-    {
-      log_content.log_length = size[0];
-      fwrite(packet.data, 1, size[0], fp);
-    }
     
     if(percent < (int)(drop_probability * 100))
     {
@@ -176,6 +138,18 @@ int main(int argc, char** argv) {
     }
     else
     {
+      if (length > BUF_SIZE)
+      { 
+        length -= BUF_SIZE;
+        log_content.log_length = BUF_SIZE;   
+        fwrite(packet.data, 1, BUF_SIZE, fp);
+      }
+      else
+      {
+        log_content.log_length = length;
+        fwrite(packet.data, 1, length, fp);
+      }
+
       log_event("SEND", &log_content, 0, log_content.log_time_taken);
       if(pre_packet.seqNum == packet.seqNum)
       {

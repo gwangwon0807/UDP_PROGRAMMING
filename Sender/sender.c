@@ -1,37 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
 #include <signal.h>
-#include <time.h>
-
-//socket통신을 위한 headerfile
-#include <arpa/inet.h>
-
-#define BUF_SIZE 200
-
-typedef struct {
-    int type;
-    int seqNum;
-    int ackNum;
-    int length;
-    char data[BUF_SIZE];
-} Packet;
-
-
-typedef struct {
-  int log_mode;
-  int log_type;
-  int log_seq;
-  int log_ack;
-  int log_length;
-  int log_loss;
-  int log_timeout;
-  float log_time_taken;
-} Log;
-
+#include "../Packet/packet.h"
 
 Packet packet;
 Packet pre_packet;
@@ -173,7 +143,11 @@ int main(int argc, char** argv)
         sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
         log_event("SEND", &log_content, log_content.log_timeout, log_content.log_time_taken);
       }
-      recvfrom(sockfd, &packet, sizeof(Packet),0, NULL, NULL);
+
+      while(recvfrom(sockfd, &packet, sizeof(Packet),0, NULL, NULL) == -1){
+        continue;
+      }
+      
       log_content.log_ack = packet.ackNum;
       log_content.log_type = packet.type;
 
