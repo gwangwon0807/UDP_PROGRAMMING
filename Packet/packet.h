@@ -1,13 +1,13 @@
-#define BUF_SIZE 200
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
-
-//socket통신을 위한 headerfile
 #include <arpa/inet.h>
+
+#define BUF_SIZE 200
 
 typedef enum{
   DATA = 0,
@@ -24,6 +24,7 @@ typedef enum{
 } PacketFlag;
 
 typedef struct {
+    int flag;
     int type;
     int seqNum;
     int ackNum;
@@ -32,6 +33,7 @@ typedef struct {
 } Packet;
 
 typedef struct {
+  int log_flag;
   int log_mode;
   int log_type;
   int log_seq;
@@ -42,3 +44,47 @@ typedef struct {
   float log_time_taken;
 } Log;
 
+FILE* log_fp;
+
+Packet packet;
+Packet signal_packet;
+Packet pre_packet;
+Log log_content;
+
+Packet create_signal_packet(int type, int flag, int seq, int ack)
+{
+  Packet pkt;
+  memset(&pkt, 0, sizeof(Packet));
+  pkt.flag = flag;
+  pkt.type = type;
+  pkt.seqNum = seq;
+  pkt.ackNum = ack;
+  pkt.length = 0;
+  return pkt;
+}
+
+Packet create_data_packet(int seq, char* data, int length)
+{
+  Packet pkt;
+  memset(&pkt, 0, sizeof(Packet));
+  pkt.flag = NONE;
+  pkt.type = DATA;
+  pkt.seqNum = seq;
+  pkt.length = length;
+  strncpy(pkt.data, data, length);
+  return pkt;
+}
+
+void log_event(const char *event, Log *log_content, int is_timeout, double duration) {
+    fprintf(log_fp, "%s\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%s\t\t%s\t\t%f ms\n", 
+            event, 
+            log_content->log_flag,
+            log_content->log_type, 
+            log_content->log_seq,
+            log_content->log_ack,
+            log_content->log_length,
+            (log_content->log_loss == 1) ? "YES" : "NO", 
+            is_timeout ? "YES" : "NO", 
+            duration);
+    fflush(log_fp);
+}

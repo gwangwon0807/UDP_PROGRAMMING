@@ -4,6 +4,7 @@
     "stdio.h": "c",
     "time.h": "c",
     "complex": "c",
-    "inet.h": "c"
+    "inet.h": "c",
+    "packet.h": "c"
   }
 }
