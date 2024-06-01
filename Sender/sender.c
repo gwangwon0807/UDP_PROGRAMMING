@@ -22,6 +22,15 @@ int main(int argc, char** argv)
   char *filename = argv[5];
   float drop_probability = atof(argv[6]);
 
+  //setting SIGALRM
+  struct sigaction sa;
+  sa.sa_handler = resend;
+  sa.sa_flags = 0;
+  sigemptyset(&sa.sa_mask);
+  sigaction(SIGALRM, &sa, NULL);
+  srand(time(NULL));
+  clock_t t;
+
   // 파일 열기
   FILE *fp = fopen(filename, "rb");
   if (fp == NULL) {
@@ -56,8 +65,10 @@ int main(int argc, char** argv)
     signal_packet = create_signal_packet(SYN, SYN_FLAG, 0, 0);
     log_content.log_flag = SYN_FLAG;
     log_content.log_type = SYN;
+    log_content.log_seq = seqNum++;
 
     strncpy(signal_packet.data, filename, strlen(filename));
+    t = clock();
     sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
     memset(&signal_packet, 0, sizeof(Packet));
 
@@ -67,9 +78,11 @@ int main(int argc, char** argv)
 
     if(signal_packet.flag == SYN_ACK)
     {
+      t = clock() - t;
+      log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC; //Send and Receive Time
       log_content.log_flag = SYN_FLAG;
       log_content.log_type = SYN;
-      log_event("RECV", &log_content, 0, 0);
+      log_event("RECV", &log_content, 0, log_content.log_time_taken);
 
       printf("Receiver: OK\n");
   
@@ -78,6 +91,7 @@ int main(int argc, char** argv)
 
       log_content.log_type = ACK;
       log_content.log_flag = NONE;
+      log_content.log_seq = seqNum++;
 
       sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
       log_event("SEND", &log_content, 0, 0);
@@ -87,28 +101,17 @@ int main(int argc, char** argv)
     }
   }
   fwrite("\n", 1, strlen("\n"), log_fp);
-  
-  // 응답 대기
-  char buffer[BUF_SIZE];
-  /*recvfrom(sockfd, buffer, BUF_SIZE, 0, NULL, NULL);
-  printf("Receiver: %s\n", buffer);*/
-  
+
+
 
   // 파일 전송
+  char buffer[BUF_SIZE];
   int size[1];
   fseek(fp, 0, SEEK_END);
   size[0] = (int)ftell(fp);
   fseek(fp, 0L, SEEK_SET);
 
-  //setting SIGALRM
-  struct sigaction sa;
-  sa.sa_handler = resend;
-  sa.sa_flags = 0;
-  sigemptyset(&sa.sa_mask);
-  sigaction(SIGALRM, &sa, NULL);
   
-  srand(time(NULL));
-  clock_t t;
 
   printf("Pleas wait..\n");
 
@@ -117,7 +120,7 @@ int main(int argc, char** argv)
   size_t bytesRead;
   memset(&packet.data, 0, sizeof(packet.data));
   memset(&log_content, 0, sizeof(Log));
-  log_content.log_ack = -999;
+  log_content.log_ack = 0;
   int length = size[0];
   int count = 1;
 
@@ -183,15 +186,20 @@ int main(int argc, char** argv)
   signal_packet = create_signal_packet(FIN, FIN_FLAG, packet.seqNum , 0);
   log_content.log_flag = FIN_FLAG;
   log_content.log_type = FIN;
+  log_content.log_seq = seqNum++;
 
   packet.type = FIN;
   packet.flag = FIN_FLAG;
   log_event("SEND", &log_content, 0, 0);
+  t = clock();
   sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   memset(&signal_packet, 0, sizeof(Packet));
 
+  t = clock() - t;
+  log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC; //Send and Receive Time
+  
   recvfrom(sockfd, &signal_packet, sizeof(Packet), 0, NULL, NULL);
-  log_event("RECV", &log_content, 0, 0);
+  log_event("RECV", &log_content, 0, log_content.log_time_taken);
   memset(&signal_packet, 0, sizeof(Packet));
 
   recvfrom(sockfd, &signal_packet, sizeof(Packet), 0, NULL, NULL);
@@ -200,6 +208,8 @@ int main(int argc, char** argv)
 
   signal_packet.type = ACK;
   signal_packet.flag = FIN_FLAG;
+  log_content.log_seq = seqNum++;
+
   log_event("SEND", &log_content, 0, 0);
   sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   memset(&signal_packet, 0, sizeof(Packet));
