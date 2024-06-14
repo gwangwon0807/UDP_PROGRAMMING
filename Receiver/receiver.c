@@ -8,6 +8,7 @@ int main(int argc, char** argv) {
 
   int receiver_port = atoi(argv[1]);
   float drop_probability = atof(argv[2]);
+  clock_t t;
 
   // 소켓 생성
   int sockfd;
@@ -50,6 +51,7 @@ int main(int argc, char** argv) {
       memset(&log_content, 0, sizeof(Log));
       log_content.log_flag = SYN_FLAG;
       log_content.log_type = SYN;
+      log_content.log_seq = signal_packet.seqNum;
       log_event("RECV", &log_content, 0, 0);
 
       printf("Sender: Greeting\n");
@@ -58,6 +60,7 @@ int main(int argc, char** argv) {
 
       memset(&signal_packet, 0, sizeof(signal_packet));
       signal_packet = create_signal_packet(ACK, SYN_ACK, 0, 1);
+      t = clock();
       sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
 
       log_content.log_type = SYN_ACK;
@@ -67,8 +70,11 @@ int main(int argc, char** argv) {
     else if (signal_packet.type == ACK)
     {
       memset(&log_content, 0, sizeof(Log));
+      t = clock() - t;
+      log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC;
       log_content.log_type = ACK;
-      log_event("RECV", &log_content, 0, 0);
+      log_content.log_seq = signal_packet.seqNum;
+      log_event("RECV", &log_content, 0, log_content.log_time_taken);
       break;
     }
     
@@ -78,6 +84,7 @@ int main(int argc, char** argv) {
     }
   }
   fwrite("\n", 1, strlen("\n"), log_fp);
+  memset(&log_content, 0, sizeof(Log));   
 
 
   // 파일 저장하기
@@ -85,7 +92,6 @@ int main(int argc, char** argv) {
   recvfrom(sockfd, size, sizeof(size), 0, (struct  sockaddr*)&client_addr,(unsigned int*)&clnt_addr_size);
   int ackNum = 1;
   srand(time(NULL));
-  clock_t t;
   int length = size[0];
   int count = 1;
   printf("Please wait..\n");
@@ -119,6 +125,7 @@ int main(int argc, char** argv) {
       signal_packet = create_signal_packet(FIN, FIN_FLAG, packet.seqNum, packet.ackNum);
       log_content.log_flag = FIN_FLAG;
       log_content.log_type = FIN;
+      log_content.log_length = 0;
 
       fwrite("\n", 1, strlen("\n"), log_fp);
       log_event("RECV", &log_content, 0, log_content.log_time_taken);
@@ -150,7 +157,8 @@ int main(int argc, char** argv) {
       continue;
     }
     else
-    {
+    { 
+      log_content.log_loss = 0;
       if (length > BUF_SIZE)
       { 
         length -= BUF_SIZE;
@@ -196,7 +204,8 @@ int main(int argc, char** argv) {
   log_event("SEND", &log_content, 0, 0);
   memset(&signal_packet, 0, sizeof(Packet));
 
-  signal_packet = create_signal_packet(FIN, FIN_FLAG, packet.seqNum, packet.ackNum);
+  signal_packet = create_signal_packet(FIN, NONE, packet.seqNum, packet.ackNum);
+  t = clock();
   sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
   log_content.log_flag = FIN_FLAG;
   log_content.log_type = FIN;
@@ -211,8 +220,11 @@ int main(int argc, char** argv) {
 
   if(signal_packet.type == ACK)
   {
+    t = clock() -t;
+    log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC;
     log_content.log_type = ACK;
-    log_event("RECV", &log_content, 0, 0);
+    log_content.log_flag = signal_packet.flag;
+    log_event("RECV", &log_content, 0, log_content.log_time_taken);
   }
 
   fclose(fp);

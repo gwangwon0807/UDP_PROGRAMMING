@@ -62,7 +62,7 @@ int main(int argc, char** argv)
     memset(&signal_packet, 0, sizeof(Packet));
     memset(&log_content, 0, sizeof(Log));
 
-    signal_packet = create_signal_packet(SYN, SYN_FLAG, 0, 0);
+    signal_packet = create_signal_packet(SYN, SYN_FLAG, seqNum, 0);
     log_content.log_flag = SYN_FLAG;
     log_content.log_type = SYN;
     log_content.log_seq = seqNum++;
@@ -87,7 +87,7 @@ int main(int argc, char** argv)
       printf("Receiver: OK\n");
   
       memset(&signal_packet, 0, sizeof(Packet));
-      signal_packet = create_signal_packet(ACK, NONE, 1, 0);
+      signal_packet = create_signal_packet(ACK, NONE, seqNum, 0);
 
       log_content.log_type = ACK;
       log_content.log_flag = NONE;
@@ -179,11 +179,12 @@ int main(int argc, char** argv)
     pre_packet = packet;
     memset(&packet, 0, sizeof(Packet));
   }
+  memset(&log_content, 0, sizeof(Log));
   fwrite("\n", 1, strlen("\n"), log_fp);
   printf("100%%\n");
 
   // 4-way Handshaking
-  signal_packet = create_signal_packet(FIN, FIN_FLAG, packet.seqNum , 0);
+  signal_packet = create_signal_packet(FIN, FIN_FLAG, seqNum , 0);
   log_content.log_flag = FIN_FLAG;
   log_content.log_type = FIN;
   log_content.log_seq = seqNum++;
@@ -206,31 +207,16 @@ int main(int argc, char** argv)
   log_event("RECV", &log_content, 0, 0);
   memset(&signal_packet, 0, sizeof(Packet));
 
-  signal_packet.type = ACK;
-  signal_packet.flag = FIN_FLAG;
-  log_content.log_seq = seqNum++;
+  signal_packet = create_signal_packet(ACK, NONE, seqNum , 0);
+  log_content.log_seq = seqNum;
+  log_content.log_ack = signal_packet.ackNum;
+  log_content.log_flag = signal_packet.flag;
 
   log_event("SEND", &log_content, 0, 0);
   sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   memset(&signal_packet, 0, sizeof(Packet));
   printf("Receiver: Welldone\n");
-
-
-  /*t = clock();
-  log_content.log_seq = packet.seqNum;
-  log_content.log_type = packet.type;
-  log_content.log_loss = 0;
-  sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-  log_event("SEND", &log_content, log_content.log_loss, 0.0);
-  
-
-
-  // 응답 대기
-  memset(buffer, 0, sizeof(buffer));
-  recvfrom(sockfd, buffer, BUF_SIZE, 0, NULL, NULL);
-  t = clock() - t;
-  float f_log_time_taken = ((float)t) / CLOCKS_PER_SEC; 
-  printf("Receiver: %s \n", buffer);*/
+  sleep(1);
 
   // 파일 닫기
   fclose(fp);
