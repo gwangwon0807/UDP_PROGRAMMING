@@ -1,5 +1,11 @@
 #include "../Packet/packet.h"
 
+int recv_seq = 0;
+int last_ack;
+int temp;
+
+void transform(Packet* pck);
+
 int main(int argc, char** argv) {
   if (argc != 3) {
         fprintf(stderr, "Usage: %s <receiver port> <drop probability>\n", argv[0]);
@@ -48,33 +54,28 @@ int main(int argc, char** argv) {
     recvfrom(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
     if(signal_packet.flag == SYN_FLAG)
     {
-      memset(&log_content, 0, sizeof(Log));
-      log_content.log_flag = SYN_FLAG;
-      log_content.log_type = SYN;
-      log_content.log_seq = signal_packet.seqNum;
-      log_event("RECV", &log_content, 0, 0);
 
+      log_event1("RECV", &log_content, &signal_packet, 0, 0);
       printf("Sender: Greeting\n");
       printf("File Namge: %s\n", signal_packet.data);
       fp = fopen(signal_packet.data, "wb");
 
-      memset(&signal_packet, 0, sizeof(signal_packet));
-      signal_packet = create_signal_packet(ACK, SYN_ACK, 0, 1);
+      signal_packet.flag = SYN_ACK;
+      signal_packet.type = ACK;
+      transform(&signal_packet);
+
       t = clock();
       sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+      log_event1("SEND", &log_content, &signal_packet, 0, 0);
 
-      log_content.log_type = SYN_ACK;
-      log_event("SEND", &log_content, 0, 0);
       memset(&signal_packet, 0, sizeof(signal_packet));
     }
     else if (signal_packet.type == ACK)
     {
-      memset(&log_content, 0, sizeof(Log));
       t = clock() - t;
       log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC;
-      log_content.log_type = ACK;
-      log_content.log_seq = signal_packet.seqNum;
-      log_event("RECV", &log_content, 0, log_content.log_time_taken);
+
+      log_event1("RECV", &log_content, &signal_packet, 0, log_content.log_time_taken);
       break;
     }
     
@@ -113,7 +114,6 @@ int main(int argc, char** argv) {
       printf("%d%%\n", count++ * 10);
     }
     
-
     if(packet.seqNum > 0)
     {
       t = clock() - t;
@@ -233,4 +233,11 @@ int main(int argc, char** argv) {
 
   return 0;
 
+}
+
+void transform(Packet* pck)
+{
+  last_ack = pck->ackNum;
+  pck->ackNum = pck->seqNum + 1;
+  pck->seqNum = last_ack;
 }

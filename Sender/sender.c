@@ -5,7 +5,13 @@ struct sockaddr_in server_addr;
 int sockfd;
 int timeout_interval;
 
+int cwnd = 1;
+int send_cnt = 0;
+int loss_cnt = 0;
+int temp;
+
 void resend();
+void transform(Packet*);
 
 int main(int argc, char** argv) 
 {
@@ -14,7 +20,7 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
     }
   memset(&pre_packet, 0, sizeof(Packet));
-  int seqNum = 0;
+  int seqNum = 1;
   int sender_port = atoi(argv[1]);
   char *receiver_ip = argv[2];
   int receiver_port = atoi(argv[3]);
@@ -63,39 +69,29 @@ int main(int argc, char** argv)
     memset(&log_content, 0, sizeof(Log));
 
     signal_packet = create_signal_packet(SYN, SYN_FLAG, seqNum, 0);
-    log_content.log_flag = SYN_FLAG;
-    log_content.log_type = SYN;
-    log_content.log_seq = seqNum++;
-
     strncpy(signal_packet.data, filename, strlen(filename));
     t = clock();
     sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    pre_packet = signal_packet;
+    log_event1("SEND", &log_content, &signal_packet, 0, 0);
+
     memset(&signal_packet, 0, sizeof(Packet));
-
-    log_event("SEND", &log_content, 0, 0);
-
     recvfrom(sockfd, &signal_packet, sizeof(Packet), 0, NULL, NULL);
-
     if(signal_packet.flag == SYN_ACK)
     {
       t = clock() - t;
       log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC; //Send and Receive Time
-      log_content.log_flag = SYN_FLAG;
-      log_content.log_type = SYN;
-      log_event("RECV", &log_content, 0, log_content.log_time_taken);
+      
+      log_event1("RECV", &log_content, &signal_packet, 0, log_content.log_time_taken);
 
       printf("Receiver: OK\n");
-  
-      memset(&signal_packet, 0, sizeof(Packet));
-      signal_packet = create_signal_packet(ACK, NONE, seqNum, 0);
 
-      log_content.log_type = ACK;
-      log_content.log_flag = NONE;
-      log_content.log_seq = seqNum++;
-
+      pre_packet = signal_packet;
+      transform(&signal_packet);
       sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-      log_event("SEND", &log_content, 0, 0);
-
+      log_event1("SEND", &log_content, &signal_packet,0, 0);
+      
+      pre_packet = signal_packet;
       memset(&signal_packet, 0, sizeof(Packet));
       break;
     }
@@ -111,10 +107,7 @@ int main(int argc, char** argv)
   size[0] = (int)ftell(fp);
   fseek(fp, 0L, SEEK_SET);
 
-  
-
   printf("Pleas wait..\n");
-
 
   sendto(sockfd, size, sizeof(size), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   size_t bytesRead;
@@ -232,4 +225,11 @@ void resend()
   log_event("SEND", &log_content, log_content.log_timeout, log_content.log_time_taken);
   alarm(timeout_interval);
   packet.type =1;
+}
+
+void transform(Packet* pck)
+{
+  temp = pck->seqNum + 1;
+  pck->seqNum = pck->ackNum;
+  pck->ackNum = temp;
 }
