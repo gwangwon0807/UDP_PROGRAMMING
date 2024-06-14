@@ -73,7 +73,7 @@ int main(int argc, char** argv)
     t = clock();
     sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
     pre_packet = signal_packet;
-    log_event1("SEND", &log_content, &signal_packet, 0, 0);
+    log_event("SEND", &log_content, &signal_packet, 0, 0);
 
     memset(&signal_packet, 0, sizeof(Packet));
     recvfrom(sockfd, &signal_packet, sizeof(Packet), 0, NULL, NULL);
@@ -82,14 +82,14 @@ int main(int argc, char** argv)
       t = clock() - t;
       log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC; //Send and Receive Time
       
-      log_event1("RECV", &log_content, &signal_packet, 0, log_content.log_time_taken);
+      log_event("RECV", &log_content, &signal_packet, 0, log_content.log_time_taken);
 
       printf("Receiver: OK\n");
 
       pre_packet = signal_packet;
       transform(&signal_packet);
       sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-      log_event1("SEND", &log_content, &signal_packet,0, 0);
+      log_event("SEND", &log_content, &signal_packet,0, 0);
       
       pre_packet = signal_packet;
       memset(&signal_packet, 0, sizeof(Packet));
@@ -120,12 +120,13 @@ int main(int argc, char** argv)
   while (bytesRead = fread(packet.data, 1, BUF_SIZE, fp) > 0)
   {
     int percent = rand() % 100;
-    packet.seqNum = seqNum;
+    packet.seqNum = pre_packet.seqNum;
+    packet.ackNum = pre_packet.ackNum;
 
-    log_content.log_seq = packet.seqNum;
+
     log_content.log_loss = 0;
     log_content.log_timeout = 0;
-    log_content.log_type = packet.type;
+
     if(length > BUF_SIZE)
     {
       length -= BUF_SIZE;
@@ -148,28 +149,32 @@ int main(int argc, char** argv)
     if(percent < (int)(drop_probability * 100))
     { 
       log_content.log_loss = 1;
-      log_event("SEND", &log_content, log_content.log_timeout, log_content.log_time_taken);
+      log_event("SEND", &log_content, &packet, log_content.log_timeout, log_content.log_time_taken);
     }
     else
     {
+      memset(&pre_packet, 0, sizeof(Packet));
+      pre_packet = packet;
+
       sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-      log_event("SEND", &log_content, log_content.log_timeout, log_content.log_time_taken);
+      log_event("SEND", &log_content, &packet,log_content.log_timeout, log_content.log_time_taken);
     }
+    memset(&pre_packet, 0, sizeof(Packet));
+    pre_packet = packet;
 
     while(recvfrom(sockfd, &packet, sizeof(Packet),0, NULL, NULL) == -1){
       continue;
     }
-    
-    log_content.log_ack = packet.ackNum;
-    log_content.log_type = packet.type;
 
     alarm(0);
     t = clock() - t;
     log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC; //Send and Receive Time
-    log_event("RECV", &log_content, log_content.log_timeout, log_content.log_time_taken);
+    log_event("RECV", &log_content, &packet, log_content.log_timeout, log_content.log_time_taken);
+    
     seqNum++;
     memset(&pre_packet, 0, sizeof(Packet));
     pre_packet = packet;
+    transform(&pre_packet);
     memset(&packet, 0, sizeof(Packet));
   }
   memset(&log_content, 0, sizeof(Log));
@@ -177,14 +182,10 @@ int main(int argc, char** argv)
   printf("100%%\n");
 
   // 4-way Handshaking
-  signal_packet = create_signal_packet(FIN, FIN_FLAG, seqNum , 0);
-  log_content.log_flag = FIN_FLAG;
-  log_content.log_type = FIN;
-  log_content.log_seq = seqNum++;
-
-  packet.type = FIN;
-  packet.flag = FIN_FLAG;
-  log_event("SEND", &log_content, 0, 0);
+  signal_packet = create_signal_packet(FIN, FIN_FLAG, pre_packet.seqNum , pre_packet.ackNum);
+  
+  transform(&signal_packet);
+  log_event("SEND", &log_content, &signal_packet, 0, 0);
   t = clock();
   sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   memset(&signal_packet, 0, sizeof(Packet));
@@ -193,19 +194,17 @@ int main(int argc, char** argv)
   log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC; //Send and Receive Time
   
   recvfrom(sockfd, &signal_packet, sizeof(Packet), 0, NULL, NULL);
-  log_event("RECV", &log_content, 0, log_content.log_time_taken);
+  log_event("RECV", &log_content, &signal_packet, 0, log_content.log_time_taken);
   memset(&signal_packet, 0, sizeof(Packet));
 
   recvfrom(sockfd, &signal_packet, sizeof(Packet), 0, NULL, NULL);
-  log_event("RECV", &log_content, 0, 0);
-  memset(&signal_packet, 0, sizeof(Packet));
+  log_event("RECV", &log_content, &signal_packet, 0, 0);
+  
+  transform(&signal_packet);
+  signal_packet.type = ACK;
+  signal_packet.flag = NONE;
 
-  signal_packet = create_signal_packet(ACK, NONE, seqNum , 0);
-  log_content.log_seq = seqNum;
-  log_content.log_ack = signal_packet.ackNum;
-  log_content.log_flag = signal_packet.flag;
-
-  log_event("SEND", &log_content, 0, 0);
+  log_event("SEND", &log_content, &signal_packet, 0, 0);
   sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   memset(&signal_packet, 0, sizeof(Packet));
   printf("Receiver: Welldone\n");
@@ -222,9 +221,13 @@ void resend()
 {
   log_content.log_timeout = 1;
   sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-  log_event("SEND", &log_content, log_content.log_timeout, log_content.log_time_taken);
+  log_event("SEND", &log_content, &packet,log_content.log_timeout, log_content.log_time_taken);
   alarm(timeout_interval);
+
   packet.type =1;
+
+  memset(&pre_packet, 0, sizeof(Packet));
+  pre_packet = packet;
 }
 
 void transform(Packet* pck)

@@ -76,22 +76,7 @@ Packet create_data_packet(int seq, char* data, int length)
   return pkt;
 }
 
-void log_event(const char *event, Log *log_content, int is_timeout, double duration) {
-    fprintf(log_fp, "%s\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%s\t\t%s\t\t%f ms\n", 
-            event, 
-            log_content->log_flag,
-            log_content->log_type, 
-            log_content->log_seq,
-            log_content->log_ack,
-            log_content->log_length,
-            (log_content->log_loss == 1) ? "YES" : "NO", 
-            is_timeout ? "YES" : "NO", 
-            duration);
-    fflush(log_fp);
-}
-
-
-void log_event1(const char *event, Log *log_content, Packet *pck, int is_timeout, double duration) 
+void log_event(const char *event, Log *log_content, Packet *pck, int is_timeout, double duration) 
 {
   log_content->log_ack = pck->ackNum;
   log_content->log_flag = pck->flag;
