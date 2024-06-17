@@ -4,6 +4,8 @@ int recv_seq = 0;
 int last_ack;
 int temp;
 
+Packet last_send_pck;
+
 void transform(Packet* pck);
 
 int main(int argc, char** argv) {
@@ -65,9 +67,10 @@ int main(int argc, char** argv) {
       transform(&signal_packet);
 
       t = clock();
+      signal_packet.ackNum++;
       sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
       log_event("SEND", &log_content, &signal_packet, 0, 0);
-
+      last_send_pck = signal_packet;
       memset(&signal_packet, 0, sizeof(signal_packet));
     }
     else if (signal_packet.type == ACK)
@@ -96,6 +99,106 @@ int main(int argc, char** argv) {
   int count = 1;
   printf("Please wait..\n");
 
+  while(1)
+  {
+    int percent = rand() % 100;
+    memset(&packet, 0, sizeof(Packet));
+    t = clock();
+    ssize_t num_bytes = recvfrom(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, (unsigned int*)&clnt_addr_size);
+
+    log_content.log_loss = 0;
+  
+    if(packet.seqNum > 0)
+    {
+      t = clock() - t;
+      log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC;
+    }
+
+    if (packet.type == FIN)
+    { 
+      fwrite("\n", 1, strlen("\n"), log_fp);
+      log_event("RECV", &log_content, &packet, 0, log_content.log_time_taken);
+      printf("100%%\n");
+      printf("Sender: Finish\n");
+
+      memset(&log_content, 0, sizeof(Log));
+      break;
+    }
+
+    log_event("RECV", &log_content, &packet, 0, log_content.log_time_taken);
+    packet.type = ACK;
+
+    if(packet.seqNum != last_send_pck.ackNum)
+    {
+      transform(&packet);
+      if(percent < (int)(drop_probability * 100))
+      {
+        log_content.log_loss = 1;
+        printf("5\n");
+
+        log_event("SEND", &log_content, &last_send_pck, 0, log_content.log_time_taken);
+        continue;
+      }
+
+      else
+      {
+        packet.ackNum = last_send_pck.ackNum;
+        packet.length = last_send_pck.length;
+        sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+        log_content.log_loss = 0;
+        printf("6\n");
+
+        log_event("SEND", &log_content, &last_send_pck, 0, log_content.log_time_taken);
+        continue;
+      }
+    }
+
+    else
+    {
+      transform(&packet);
+      if(percent < (int)(drop_probability * 100))
+      {
+        log_content.log_loss = 1;
+
+        printf("1\n");
+        log_event("SEND", &log_content, &packet, 0, log_content.log_time_taken);
+        continue;
+      }
+      else
+      {
+        log_content.log_loss = 0;
+        if (length > BUF_SIZE)
+        { 
+          length -= BUF_SIZE;
+          packet.length = BUF_SIZE;   
+          fwrite(packet.data, 1, BUF_SIZE, fp);
+        }
+        else
+        {
+          packet.length = length;
+          fwrite(packet.data, 1, length, fp);
+        }
+
+        printf("2\n");
+        log_event("SEND", &log_content, &packet, 0, log_content.log_time_taken);
+        packet.ackNum += packet.length;
+        sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+
+        /*if(last_send_pck.seqNum == packet.seqNum)
+        {
+          sendto(sockfd, &last_send_pck, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+        }    
+        else
+        {
+          sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+        }*/
+      }
+    }
+    memset(&last_send_pck,0,sizeof(Packet));
+    last_send_pck = packet;
+  }    
+
+/*
   while(1)
   {
     int percent = rand() % 100;
@@ -171,6 +274,7 @@ int main(int argc, char** argv) {
     memset(&pre_packet,0,sizeof(Packet));
     pre_packet = packet;
   }
+  */
 
   transform(&packet);
   packet.type = ACK;
@@ -208,6 +312,6 @@ int main(int argc, char** argv) {
 void transform(Packet* pck)
 {
   last_ack = pck->ackNum;
-  pck->ackNum = pck->seqNum + 1;
+  pck->ackNum = pck->seqNum;
   pck->seqNum = last_ack;
 }

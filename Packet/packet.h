@@ -64,26 +64,15 @@ Packet create_signal_packet(int type, int flag, int seq, int ack)
   return pkt;
 }
 
-Packet create_data_packet(int seq, char* data, int length)
-{
-  Packet pkt;
-  memset(&pkt, 0, sizeof(Packet));
-  pkt.flag = NONE;
-  pkt.type = DATA;
-  pkt.seqNum = seq;
-  pkt.length = length;
-  strncpy(pkt.data, data, length);
-  return pkt;
-}
-
 void log_event(const char *event, Log *log_content, Packet *pck, int is_timeout, double duration) 
 {
   log_content->log_ack = pck->ackNum;
   log_content->log_flag = pck->flag;
   log_content->log_seq = pck->seqNum;
   log_content->log_type = pck->type;
+  log_content->log_length = pck->length;
 
-  fprintf(log_fp, "%s\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%s\t\t%s\t\t%f ms\n", 
+  fprintf(log_fp, "%s\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%s\t\t%s\t\t%f s\n", 
           event, 
           log_content->log_flag,
           log_content->log_type, 

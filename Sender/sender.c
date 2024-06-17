@@ -1,13 +1,19 @@
 #include <signal.h>
+#include <math.h>
 #include "../Packet/packet.h"
 
 struct sockaddr_in server_addr;
+Packet last_recv_pck;
+
+FILE *fp;
+
 int sockfd;
 int timeout_interval;
 
 int cwnd = 1;
 int send_cnt = 0;
-int loss_cnt = 0;
+int ssthresh = 10000;
+int dup_ack = 0;
 int temp;
 
 void resend();
@@ -19,6 +25,7 @@ int main(int argc, char** argv)
         fprintf(stderr, "Usage: %s <sender port> <receiver IP> <receiver port> <timeout interval> <filename> <drop probability>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
+
   memset(&pre_packet, 0, sizeof(Packet));
   int seqNum = 1;
   int sender_port = atoi(argv[1]);
@@ -38,7 +45,7 @@ int main(int argc, char** argv)
   clock_t t;
 
   // 파일 열기
-  FILE *fp = fopen(filename, "rb");
+  fp = fopen(filename, "rb");
   if (fp == NULL) {
     perror("file open failed");
     exit(EXIT_FAILURE);
@@ -86,12 +93,12 @@ int main(int argc, char** argv)
 
       printf("Receiver: OK\n");
 
-      pre_packet = signal_packet;
+      last_recv_pck = signal_packet;
       transform(&signal_packet);
       sendto(sockfd, &signal_packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
       log_event("SEND", &log_content, &signal_packet,0, 0);
       
-      pre_packet = signal_packet;
+      memset(&pre_packet, 0, sizeof(Packet));
       memset(&signal_packet, 0, sizeof(Packet));
       break;
     }
@@ -101,7 +108,6 @@ int main(int argc, char** argv)
 
 
   // 파일 전송
-  char buffer[BUF_SIZE];
   int size[1];
   fseek(fp, 0, SEEK_END);
   size[0] = (int)ftell(fp);
@@ -110,13 +116,127 @@ int main(int argc, char** argv)
   printf("Pleas wait..\n");
 
   sendto(sockfd, size, sizeof(size), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-  size_t bytesRead;
+  size_t bytesRead = 1;
   memset(&packet.data, 0, sizeof(packet.data));
   memset(&log_content, 0, sizeof(Log));
   log_content.log_ack = 0;
   int length = size[0];
   int count = 1;
+  printf("%d\n", size[0]);
+  int cur_seq;
 
+  while((int)ftell(fp) != size[0])
+  {
+    for(int i = 0; i < cwnd; i++)
+    {
+      int start_offset;
+
+      if(i == 0)
+      {
+        cur_seq = last_recv_pck.ackNum;
+        start_offset = last_recv_pck.ackNum - 2;
+        fseek(fp, (long)start_offset, SEEK_SET);
+      }
+      else
+      {
+        cur_seq += pre_packet.length;
+      }
+      packet.seqNum = cur_seq;
+      packet.ackNum = last_recv_pck.seqNum + 1;
+      printf("curseq:[%d]\n", cur_seq);
+      bytesRead = fread(packet.data, 1, BUF_SIZE, fp);
+      
+      int percent = rand() % 100;
+      
+      packet.length = strlen(packet.data);
+
+      log_content.log_loss = 0;
+      log_content.log_timeout = 0;
+      
+      if(i == cwnd -1)
+      {
+        alarm(timeout_interval);
+        t = clock();
+      }
+      
+      printf("%s\n", packet.data);
+
+      if(percent < (int)(drop_probability * 100))
+      { 
+        log_content.log_loss = 1;
+        log_event("SEND", &log_content, &packet, log_content.log_timeout, log_content.log_time_taken);
+      }
+      else
+      {
+        sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+        log_event("SEND", &log_content, &packet,log_content.log_timeout, log_content.log_time_taken);
+      }
+
+      send_cnt++;
+      pre_packet = packet;
+      memset(&log_content, 0, sizeof(Log));
+      memset(&packet, 0, sizeof(Packet));
+
+      if(bytesRead<= 0)
+      {
+        break;
+      }
+    }
+    
+
+    for(int i = 0; i < send_cnt; i++)
+    {
+      printf("hello\n");
+
+      recvfrom(sockfd, &last_recv_pck, sizeof(Packet),0, NULL, NULL);
+
+      if(log_content.log_timeout == 1)
+      {
+        printf("timeout\n");
+        break;
+      }
+
+      if(i == send_cnt - 1)
+      { 
+        alarm(0);
+        t = clock() - t;  
+        log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC; //Send and Receive Time
+      }
+      else
+      {
+        t = clock() - t;  
+        log_content.log_time_taken = ((float)t) / CLOCKS_PER_SEC;
+      }
+      
+      log_event("RECV", &log_content, &last_recv_pck, 0, log_content.log_time_taken);
+
+      if (pre_packet.ackNum == last_recv_pck.ackNum)
+      {
+        if(++dup_ack == 3)
+        {
+          ssthresh = (int)ceil(cwnd / 2);
+          cwnd = ssthresh + 3;
+          dup_ack = 0;
+          break;
+        }
+        continue;
+      }
+      if (cwnd >= ssthresh)
+      {
+        cwnd += 1/cwnd;
+      }
+      else
+      {
+        cwnd += 1;
+      }
+      pre_packet = last_recv_pck;
+    }
+    send_cnt = 0;
+  }
+
+
+
+  /*
   while (bytesRead = fread(packet.data, 1, BUF_SIZE, fp) > 0)
   {
     int percent = rand() % 100;
@@ -176,7 +296,7 @@ int main(int argc, char** argv)
     pre_packet = packet;
     transform(&pre_packet);
     memset(&packet, 0, sizeof(Packet));
-  }
+  }*/
   memset(&log_content, 0, sizeof(Log));
   fwrite("\n", 1, strlen("\n"), log_fp);
   printf("100%%\n");
@@ -219,6 +339,19 @@ int main(int argc, char** argv)
 
 void resend()
 {
+  printf("resend\n");
+  log_content.log_timeout = 1;
+  ssthresh = (int)ceil(cwnd / 2);
+  cwnd = 1;
+  dup_ack = 0;
+  fseek(fp, last_recv_pck.ackNum - 2, SEEK_SET);
+  fwrite("<\n----------------------RTO---------------------->\n\n", 1, strlen("\n<----------------------RTO---------------------->\n\n"), log_fp);
+  alarm(0);
+}
+
+/*
+void resend()
+{
   log_content.log_timeout = 1;
   sendto(sockfd, &packet, sizeof(Packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
   log_event("SEND", &log_content, &packet,log_content.log_timeout, log_content.log_time_taken);
@@ -229,6 +362,7 @@ void resend()
   memset(&pre_packet, 0, sizeof(Packet));
   pre_packet = packet;
 }
+*/
 
 void transform(Packet* pck)
 {
