@@ -45,6 +45,7 @@ typedef struct {
 } Log;
 
 FILE* log_fp;
+FILE* log_cwnd;
 
 Packet packet;
 Packet signal_packet;
@@ -72,7 +73,7 @@ void log_event(const char *event, Log *log_content, Packet *pck, int is_timeout,
   log_content->log_type = pck->type;
   log_content->log_length = pck->length;
 
-  fprintf(log_fp, "%s\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%s\t\t%s\t\t%f s\n", 
+  fprintf(log_fp, "%s\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%s\t\t%s\t\t%fs\n", 
           event, 
           log_content->log_flag,
           log_content->log_type, 
@@ -83,6 +84,12 @@ void log_event(const char *event, Log *log_content, Packet *pck, int is_timeout,
           is_timeout ? "YES" : "NO", 
           duration);
   fflush(log_fp);
+}
+
+void log_event_cwnd(const char *event, int cwnd, int ssthresh)
+{
+  fprintf(log_cwnd, "%s\t\t\t%d\t\t\t%d\n", event, cwnd, ssthresh);
+  fflush(log_cwnd);
 }
 
 
