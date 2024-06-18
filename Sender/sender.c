@@ -15,6 +15,7 @@ int send_cnt = 0;
 int ssthresh = 10000;
 int dup_ack = 0;
 int temp;
+float cong_avoid = 0.0;
 
 void resend();
 void transform(Packet*);
@@ -179,6 +180,7 @@ int main(int argc, char** argv)
       }
     }
     log_event_cwnd("SEND      ", cwnd, ssthresh);
+    cong_avoid = 0.0;
 
     for(int i = 0; i < send_cnt; i++)
     {
@@ -220,8 +222,12 @@ int main(int argc, char** argv)
       }
       if (cwnd >= ssthresh)
       {
-        cwnd += 1/cwnd;
+        cong_avoid += 1.0/(float)cwnd;
         log_event_cwnd("Cong-avoid", cwnd, ssthresh);
+        if(cong_avoid >= 1.0)
+        {
+          cwnd += 1;
+        }
       }
       else
       {
