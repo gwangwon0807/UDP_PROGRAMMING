@@ -3,8 +3,8 @@
 (Reciver's role is server, Sender's role is client)
 2. First of all, enter the Reciver directory and type up this sentence "gcc -o receiver receiver.c".
 3. And then, enter another terminal and type up this sentence "gcc -o sender sender.c".
-4. If you've finished that, go to the Receiver terminal and type up "./receiver <receiver's port> <drop_probability>. ex. "./receive 12345 0.1".
-5. Go to the Sender terminal and you must type up "./sender <sender' port> <receiver's IP> <receiver's port> <timout interval> <file name> <drop probability>. ex. "./sender 12346 127.0.0.1 12345 1 hello.txt 0.1".
+4. If you've finished that, go to the Receiver terminal and type up "./receiver <receiver's port> <drop_probability>. e.g., "./receive 12345 0.1".
+5. Go to the Sender terminal and you must type up "./sender <sender' port> <receiver's IP> <receiver's port> <timout interval> <file name> <drop probability>. e.g., "./sender 12346 127.0.0.1 12345 1 hello.txt 0.1".
 
 // If you want to go to the this directory then, you can type up this command.
 1. cd ./Receiver and cd ./Sender 
@@ -21,7 +21,7 @@
 4. This program has drop probability. If dropped packet, occur timeout and resend. Function as pakcet loss.
 5. Be written log.txt file in each directory. That include (Flage, type, seq, ack, length, loss, timout, time).
 6. Alarm system call must be entered in seconds in C. So minimum timout interval's size is '1'.
-7. Drop probability must be decimal type, ex. 0.1, 0.2....
+7. Drop probability must be decimal type, e.g., 0.1, 0.2....
 8. Cwnd is increase exponentialy on slow start mode.
 9. If dropped packet and occured 3dup-ack or RTO, ssthresh is cwnd / 2. And then, cwnd will increas slowly(Each Ack -> cwnd + 1 / cwnd)
 10. If occured 3dup-ack, CWND size is sshtresh + 3. and, If occured RTO, CWND size is 1.
